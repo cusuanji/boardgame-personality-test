@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BGTI 桌游人格测试</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+.container { width: 100%; max-width: 500px; background: #fff; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+.header { background: linear-gradient(135deg, #4a7dff 0%, #6b5ce7 100%); color: #fff; padding: 40px 30px; text-align: center; }
+.header h1 { font-size: 28px; margin-bottom: 8px; }
+.header p { font-size: 16px; opacity: 0.9; }
+.content { padding: 30px; }
+.btn-group { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+.btn { padding: 16px 24px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+.btn:hover { transform: translateY(-2px); }
+.btn-primary { background: linear-gradient(135deg, #4a7dff, #6b5ce7); color: #fff; }
+.btn-secondary { background: #f0f2ff; color: #4a7dff; border: 2px solid #4a7dff; }
+.progress { margin-bottom: 20px; }
+.progress-text { font-size: 14px; color: #888; margin-bottom: 8px; }
+.progress-bar { height: 6px; background: #e8e8e8; border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #4a7dff, #6b5ce7); transition: width 0.3s; }
+.question { font-size: 16px; font-weight: bold; color: #1a1a2e; line-height: 1.6; margin-bottom: 20px; }
+.options { display: flex; flex-direction: column; gap: 10px; }
+.option { padding: 14px 16px; background: #f8f9fa; border: 2px solid transparent; border-radius: 10px; font-size: 14px; line-height: 1.5; cursor: pointer; transition: all 0.2s; text-align: left; }
+.option:hover { background: #e8f0ff; border-color: #4a7dff; }
+.option.selected { background: #e8f0ff; border-color: #4a7dff; color: #4a7dff; font-weight: bold; }
+.option .label { font-weight: bold; margin-right: 8px; }
+.btn-nav { display: flex; gap: 12px; margin-top: 20px; }
+.btn-back { background: #f0f2ff; color: #666; flex: 1; }
+.btn-next { background: linear-gradient(135deg, #4a7dff, #6b5ce7); color: #fff; flex: 2; }
+.quick-intro { font-size: 14px; color: #666; line-height: 1.6; margin-bottom: 16px; padding: 14px; background: #f8f9fa; border-radius: 10px; }
+.quick-intro code { background: #e8f0ff; padding: 2px 6px; border-radius: 4px; color: #4a7dff; }
+textarea { width: 100%; height: 200px; padding: 14px; font-size: 14px; border: 2px solid #e8e8e8; border-radius: 10px; resize: none; font-family: inherit; line-height: 1.8; }
+textarea:focus { outline: none; border-color: #4a7dff; }
+.input-hint { font-size: 12px; color: #888; margin-top: 8px; }
+.hidden { display: none !important; }
+.result-canvas-container { padding: 16px; display: flex; justify-content: center; align-items: center; background: #f8f9fa; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; }
+.result-canvas { border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.12); max-width: 100%; max-height: 100%; object-fit: contain; }
+.btn-restart { background: #f0f2ff; color: #4a7dff; margin: 16px 20px; width: calc(100% - 40px); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 首页 -->
+  <div id="page-home">
+    <div class="header">
+      <h1>🎲 BGTI 桌游人格测试</h1>
+      <p>测测你是哪种桌游玩家</p>
+    </div>
+    <div class="content">
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="startNormal()">🎮 开始测试</button>
+        <button class="btn btn-secondary" onclick="startQuick()">⚡ 快捷测试</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 逐题测试页 -->
+  <div id="page-normal" class="hidden">
+    <div class="content">
+      <div class="progress">
+        <div class="progress-text">第 <span id="q-num">1</span> / 20 题</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 5%"></div></div>
+      </div>
+      <div class="question" id="question"></div>
+      <div class="options" id="options"></div>
+      <div class="btn-nav">
+        <button class="btn btn-back" onclick="prevQ()">上一题</button>
+        <button class="btn btn-next" onclick="nextQ()">下一题</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 快捷测试页 -->
+  <div id="page-quick" class="hidden">
+    <div class="content">
+      <div class="quick-intro">
+        输入你的20个答案字母。<br>
+        例如：<code>AABCDBCCDDAEBFCGDHABCDE</code><br><br>
+        对应题目：Q1→Q20，每个答案从 A/B/C/D 中选择。
+      </div>
+      <textarea id="quick-input" placeholder="AABCDBCCDDAEBFCGDHABCDE"></textarea>
+      <div class="input-hint">直接输入即可，中间有空格会自动忽略</div>
+      <div class="btn-nav">
+        <button class="btn btn-back" onclick="showHome()">返回</button>
+        <button class="btn btn-next" onclick="submitQuick()">查看结果</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结果页 -->
+  <div id="page-result" class="hidden">
+    <div class="result-canvas-container">
+      <canvas id="resultCanvas" class="result-canvas" width="472" height="630"></canvas>
+    </div>
+    <button class="btn btn-restart" onclick="restart()">🔄 重新测试</button>
+  </div>
+</div>
+
+<script>
+// ── 20道题 ──────────────────────────────────────────────
+var questions = [
+  { id: 1, dim: 'S', multi: false, q: "面对一个有多条胜利路径的游戏，你更倾向于：", options: [{label:'A',text:'来个习惯全局超长线规划，享受中后期发力翻转',score:4},{label:'B',text:'习惯规划接下来2-3步，习惯有规划的扩大优势，逐步获胜',score:2},{label:'C',text:'精算当前回合最大收益，一步先步步先',score:-2},{label:'D',text:'习惯开局跟着桌上大佬的思路走，中后期看有无机会反客为主',score:-4}] },
+  { id: 2, dim: 'S', multi: false, q: "如果这个月你只能玩一天桌游，你最想玩：", options: [{label:'A',text:'德式策略（波多黎各、方舟动物园）',score:4},{label:'B',text:'美式主题（诡镇奇谈、阿瑞迪亚）',score:2},{label:'C',text:'派对游戏（出神入画、行动代号）',score:-2},{label:'D',text:'抽象棋类（战争之匣、圈套棋）',score:-4}] },
+  { id: 3, dim: 'S', multi: false, q: "游戏中需要长远规划时，你通常：", options: [{label:'A',text:'制定5轮以上的详细计划，每步有预案',score:4},{label:'B',text:'只规划接下来1-2轮，保持灵活',score:2},{label:'C',text:'走一步看一步，见招拆招',score:-2},{label:'D',text:'看别人怎么做，跟着走不费力',score:-4}] },
+  { id: 4, dim: 'N', multi: false, q: "你选择游戏时，最看重什么？", options: [{label:'A',text:'机制深度和策略性',score:-4},{label:'B',text:'主题吸引力和代入感',score:4},{label:'C',text:'美术设计和配件颜值',score:2},{label:'D',text:'游戏时长和上手难度',score:-2}] },
+  { id: 5, dim: 'N', multi: false, q: "在角色扮演类游戏中，你：", options: [{label:'A',text:'会为角色编造背景故事，用角色语气说话',score:4},{label:'B',text:'按规则扮演，但不额外创作',score:2},{label:'C',text:'只关注角色能力值，故事是什么？',score:-2},{label:'D',text:'觉得角色扮演有点尴尬，能不演就不演',score:-4}] },
+  { id: 6, dim: 'N', multi: false, q: "游戏结束后，你更可能：", options: [{label:'A',text:'讨论刚才发生的精彩故事和名场面',score:4},{label:'B',text:'分析胜负关键和策略得失',score:-2},{label:'C',text:'马上开下一局，废话少说',score:-2},{label:'D',text:'回味游戏的整体氛围和体验',score:2}] },
+  { id: 7, dim: 'C', multi: false, q: "游戏对你来说最重要的是：", options: [{label:'A',text:'获胜！这是游戏存在的意义',score:4},{label:'B',text:'享受过程，输赢无所谓',score:-4},{label:'C',text:'和朋友在一起的时光',score:-2},{label:'D',text:'学习和提高技巧的过程',score:2}] },
+  { id: 8, dim: 'C', multi: false, q: "当你明显落后时，你会：", options: [{label:'A',text:'更加认真，找翻盘机会，不到最后不放弃',score:4},{label:'B',text:'开始尝试有趣但不高效的"快乐玩法"',score:-2},{label:'C',text:'帮领先者快点结束，早点开下一局',score:-4},{label:'D',text:'复盘分析落后原因，下次改进',score:2}] },
+  { id: 9, dim: 'C', multi: false, q: "第一次玩新游戏（教学局），你会：", options: [{label:'A',text:'依然全力争胜，教学归教学',score:4},{label:'B',text:'以熟悉规则为主，胜负随意',score:2},{label:'C',text:'故意让着新手，帮ta建立信心',score:-2},{label:'D',text:'各种操作都试一遍，当实验局',score:2}] },
+  { id: 10, dim: 'O', multi: false, q: "周末想玩桌游时，你通常：", options: [{label:'A',text:'主动群发消息组局，定时间地点',score:4},{label:'B',text:'私聊两三个常玩的朋友',score:2},{label:'C',text:'等别人发起，有局就参加',score:-2},{label:'D',text:'自己去桌游店碰运气',score:-4}] },
+  { id: 11, dim: 'O', multi: false, q: "确定游戏时间和地点时，你：", options: [{label:'A',text:'积极协调所有人的时间，找最优解',score:4},{label:'B',text:'提供建议，但不强求',score:2},{label:'C',text:'听从安排，我都可以',score:-2},{label:'D',text:'希望别人全安排好，我人到就行',score:-4}] },
+  { id: 12, dim: 'O', multi: false, q: "新游戏到货后，你：", options: [{label:'A',text:'当天就约人开箱试玩',score:4},{label:'B',text:'先研究规则，找合适机会再开',score:2},{label:'C',text:'放在柜子里，等有人提出想玩',score:-2},{label:'D',text:'先自己开箱把玩配件，爽一下',score:-4}] },
+  { id: 13, dim: 'T', multi: false, q: "在谈判/交易类游戏中，你：", options: [{label:'A',text:'积极发起交易，每笔都要占便宜',score:4},{label:'B',text:'等待别人来找我，被动回应',score:2},{label:'C',text:'尽量自给自足，能不交易就不交易',score:-2},{label:'D',text:'交易只为聊天社交，赚亏无所谓',score:-4}] },
+  { id: 14, dim: 'T', multi: false, q: "你更享受哪种互动？", options: [{label:'A',text:'心理博弈和虚张声势，骗到人超爽',score:4},{label:'B',text:'策略配合和团队协作',score:2},{label:'C',text:'独立思考，安静做自己的决策',score:-2},{label:'D',text:'轻松闲聊和玩笑，游戏只是聊天借口',score:-4}] },
+  { id: 15, dim: 'B', multi: false, q: "你购买桌游的频率大约是：", options: [{label:'A',text:'每月都买，看见心动就下单',score:4},{label:'B',text:'每季度买1-2款，有规划地入',score:2},{label:'C',text:'每年只买几款特别想要的',score:-2},{label:'D',text:'很少买，主要蹭别人的玩',score:-4}] },
+  { id: 16, dim: 'B', multi: false, q: "买桌游时，你一般怎么选？", options: [{label:'A',text:'游戏性和重开率，玩10次就是十倍性价比！',score:4},{label:'B',text:'美术颜值和主题吸引力，不好玩也是好看的砖！',score:2},{label:'C',text:'朋友推荐和圈内热度，大家说好的不会错！',score:-2},{label:'D',text:'价格和性价比，便宜也有好货！',score:-4}] },
+  { id: 17, dim: 'egg_S', multi: false, egg: true, q: "约好大家分别看规则，结果下班到家已经很晚了——", options: [{label:'A',text:'毕竟每次都是我来主讲，熬夜也要看完！',tag:'规则判官',score:4},{label:'B',text:'明天路上看视频学一下呗，这游戏能有多难',tag:'洒脱派',score:-2},{label:'C',text:'第二天早起，通读规则，关键机制拍下来存手机',tag:'钻研实干家',score:2},{label:'D',text:'反正他们也会看，让他们讲呗',tag:'蹭局型',score:-4}] },
+  { id: 18, dim: 'egg_B', multi: false, egg: true, q: '看到有人把你的卡牌折角了，你内心OS是什么？', options: [{label:'A',text:'立刻要求赔偿',tag:'配件守护神',score:4},{label:'B',text:'心在滴血，但嘴上说"没事没事"',tag:'隐忍心痛者',score:2},{label:'C',text:'"游戏就是用来玩的嘛"——真心话',tag:'洒脱圣人',score:-4},{label:'D',text:'挥出正义铁拳，但还是打个哈哈过去了',tag:'自我牺牲型选手',score:-2}] },
+  { id: 19, dim: 'egg_O', multi: false, egg: true, q: '有人说"咱们玩点简单的吧"，你的理解是？', options: [{label:'A',text:'简单的是说轻策游戏吗？可以的',tag:'策略原教旨主义者',score:4},{label:'B',text:'他累了，那可以玩聚会游戏！没问题！',tag:'派对快乐狗',score:2},{label:'C',text:'完了，又要陪人玩小辣鸡了',tag:'社交疲劳症',score:-2},{label:'D',text:'"简单"是什么？喝杯咖啡给我继续重德！',tag:'硬核受虐狂',score:-4}] },
+  { id: 20, dim: 'egg', multi: false, egg: true, q: "终极灵魂拷问：如果必须选一个——", options: [{label:'A',text:'永远不能赢，但每次都超开心',tag:'快乐输家',score:0},{label:'B',text:'每次都能赢，但没人愿意和你玩',tag:'孤独赢家',score:0},{label:'C',text:'只能玩一款游戏，但能玩到极致',tag:'专一大师',score:0},{label:'D',text:'玩遍所有游戏，但永远是新手上路',tag:'永恒萌新',score:0}] }
+];
+
+// ── 20种人格完整数据 ──────────────────────────────────────
+var personalities = {
+  '解题机器': { type: 'SC', tags: ['规则判官', '洒脱派'], hiddenTags: ['规则判官', '洒脱派', '硬核受虐狂'], radar: [8.5, 4.2, 7.8, 5.5, 3.0, 4.8], desc: '开局前已备好三套方案，对手犯错前就知道他们会犯什么错。输了？概率问题，不是你的问题。把每局当考试，永远在备考状态。朋友说你"玩起来像写代码"——你觉得这是夸奖。', bestMatch: { name: '故事说书人', desc: '你负责赢，他负责让这局有意思' }, worstMatch: { name: '气氛发动机', desc: '他要聊天，你要专注，频道错位' } },
+  '规则学者': { type: 'SN', tags: ['钻研实干家', '规则判官'], hiddenTags: ['钻研实干家', '规则判官', '策略原教旨主义者'], radar: [7.2, 8.1, 5.5, 4.8, 4.2, 5.0], desc: '认真读完全部规则书，读完还会说"哇这个世界观设计得真不错"。买游戏看机制深度，但玩起来忍不住代入故事。BGG既有深度策略分析，也有剧情向评测。问你"好不好玩"，回答不少于三百字。', bestMatch: { name: '美术氪金狗', desc: '你提供深度，他提供美感' }, worstMatch: { name: '桌面嘴炮王', desc: '你想讲规则，他想开始聊交易' } },
+  '棋盘角斗士': { type: 'SO', tags: ['硬核受虐狂', '策略原教旨主义者'], hiddenTags: ['硬核受虐狂', '策略原教旨主义者', '规则判官'], radar: [8.0, 3.5, 8.5, 7.5, 4.0, 5.0], desc: '你组局不是为了玩，是为了找到足够强的对手。你的消息一般是："这周六晚上，德德局，不想思考的别来。"好的桌游局需要认真的人，所以你既要策划游戏，又要筛选玩家。进你的局要准备好全力以赴。', bestMatch: { name: '胜利方程式', desc: '互相理解，都很认真' }, worstMatch: { name: '路人甲', desc: '他不认真，你很崩溃' } },
+  '世界观收藏家': { type: 'NS', tags: ['永恒萌新', '洒脱圣人'], hiddenTags: ['永恒萌新', '洒脱圣人', '派对快乐狗'], radar: [6.5, 8.8, 4.5, 4.0, 5.5, 7.0], desc: '《诡镇奇巧》的克总体系、《2077》的赛博世界、《星球大战》的银河史诗——每款游戏的背景设定都是一个值得深入探索的平行宇宙。你的书柜上摆的不是游戏，是你精心收藏的宇宙。', bestMatch: { name: '故事说书人', desc: '都爱剧情，相处愉快' }, worstMatch: { name: '解题机器', desc: '"别世界观了，你就说规则"' } },
+  '故事说书人': { type: 'NT', tags: ['派对快乐狗', '角色扮演疯子'], hiddenTags: ['派对快乐狗', '角色扮演疯子', '快乐输家'], radar: [4.0, 8.5, 4.5, 5.5, 7.5, 5.0], desc: '每局结束后，你能把它复述成一段引人入胜的故事。玩《阿瓦隆》时脑子里有完整的宫廷政治剧本；玩《潘多拉之心》时忍不住给角色加戏。朋友打完牌，你还在讲"当时那一刻"——而且大家都愿意听。', bestMatch: { name: '角色扮演疯子', desc: '两人组成最强叙事duo' }, worstMatch: { name: '解题机器', desc: '你在讲故事，他在算收益' } },
+  '美术氪金狗': { type: 'NB', tags: ['洒脱圣人', '颜控败家子'], hiddenTags: ['洒脱圣人', '颜控败家子', '自我牺牲型选手'], radar: [3.5, 7.5, 3.0, 4.5, 5.0, 8.5], desc: '消费逻辑只有一条：好看就买。精美插画、丰富配件、质感满分卡牌——这些的吸引力远超规则复杂度。会为一幅主题绝美的画掏空钱包，然后摆在最显眼的位置，让所有人来欣赏。', bestMatch: { name: '测评博主', desc: '你提供审美，他提供深度，配合绝佳' }, worstMatch: { name: '路人甲', desc: '你精心买的游戏，他随便玩玩' } },
+  '胜利方程式': { type: 'CS', tags: ['硬核受虐狂', '钻研实干家'], hiddenTags: ['硬核受虐狂', '钻研实干家', '规则判官'], radar: [8.8, 4.0, 9.0, 5.0, 4.5, 4.5], desc: '输掉一局时不是沮丧，而是困惑——明明算好了，怎么会输？研究策略不是兴趣，是刚需。BGG攻略帖都看过，热门游戏最优解都背过。对"运气"这个词深恶痛绝，因为意味着算法出现了不可控变量。', bestMatch: { name: '棋盘角斗士', desc: '都要求认真，天作之合' }, worstMatch: { name: '故事说书人', desc: '你要赢，他要讲故事，难以契合' } },
+  '桌面嘴炮王': { type: 'CT', tags: ['自我牺牲型选手', '社交疲劳症'], hiddenTags: ['自我牺牲型选手', '社交疲劳症', '派对快乐狗'], radar: [5.5, 4.0, 7.5, 5.0, 9.0, 4.0], desc: '真正的战场不在牌桌上，在嘴上。谈判技巧可以让别人用两个资源换你一个，还觉得自己赚了。上一轮给别人一发火箭炮，这一轮又在鼓动对方一起打别人。身份游戏？所有游戏我都可以聊的！', bestMatch: { name: '谈判勒索犯', desc: '两人同台，精彩程度翻倍' }, worstMatch: { name: '规则学者', desc: '他要讲规则，你要开打' } },
+  '赛场主办方': { type: 'CO', tags: ['策略原教旨主义者', '孤独赢家'], hiddenTags: ['策略原教旨主义者', '孤独赢家', '硬核受虐狂'], radar: [6.5, 4.5, 8.0, 8.0, 5.5, 6.0], desc: '组局是因为需要更多对手。你的桌游群不只是约局的地方，更是你建的擂台。精心选择游戏和玩家，创造公平竞争环境——然后在里面赢所有人。每次聚会都是小型锦标赛。', bestMatch: { name: '组局永动机', desc: '一个提供场地和人，一个提供竞技氛围' }, worstMatch: { name: '体验导演人', desc: '他要创造体验，你要分出胜负' } },
+  '组局永动机': { type: 'OT', tags: ['派对快乐狗', '气氛发动机'], hiddenTags: ['派对快乐狗', '气氛发动机', '自我牺牲型选手'], radar: [4.0, 4.5, 4.0, 9.0, 7.5, 5.5], desc: '手机里有二十个桌游群，每周五晚上必定活跃。"今晚有人吗""周六下午空的扣1""明天谁来""投票接龙填一下哈"——这些消息有一半是你发的。你负责调动气氛、处理矛盾、安抚输家。没有你，一半的局都开不起来。', bestMatch: { name: '路人甲', desc: '你组局，他填人数，互相成就' }, worstMatch: { name: '解题机器', desc: '你要热闹，他要安静算牌' } },
+  '桌游传教士': { type: 'OB', tags: ['社交疲劳症', '桌游安利狂'], hiddenTags: ['社交疲劳症', '桌游安利狂', '派对快乐狗'], radar: [4.5, 5.0, 4.5, 8.5, 6.0, 7.5], desc: '买桌游不只是为了自己玩——是为了让更多人玩桌游。每次入手新游戏，第一反应是"这个要推给谁"。是朋友圈里的安利机，推荐成功率奇高——因为总能找到最合适的人和最合适的游戏配对。', bestMatch: { name: '美术氪金狗', desc: '一个买买买，一个推推推，良性循环' }, worstMatch: { name: '路人甲', desc: '你热情安利，他完全不买账' } },
+  '体验导演人': { type: 'ON', tags: ['快乐输家', '派对快乐狗'], hiddenTags: ['快乐输家', '派对快乐狗', '自我牺牲型选手'], radar: [4.5, 8.0, 3.5, 8.5, 6.5, 5.0], desc: '组局，是想为朋友创造一次难忘的体验。挑游戏的眼光像在策划展览：氛围要对，人要合适，时机要好。会为了让朋友第一次玩阿瑞迪亚的体验足够完美，提前一周准备背景音乐。你不只是在组局，你在导演一场演出。', bestMatch: { name: '故事说书人', desc: '你营造氛围，他补充叙事' }, worstMatch: { name: '胜利方程式', desc: '他要赢，你要体验，南辕北辙' } },
+  '谈判勒索犯': { type: 'TC', tags: ['孤独赢家', '自我牺牲型选手'], hiddenTags: ['孤独赢家', '自我牺牲型选手', '社交疲劳症'], radar: [6.0, 3.5, 7.0, 4.5, 9.2, 4.0], desc: '《卡坦岛》里从来不缺资源，因为没人敢不和你交易。策略只有一条：让对方觉得不答应会更惨。一句话能翻转《阿瓦隆》全局，用一个冷笑逼死一个《三国杀》忠臣。对你来说，游戏只是嘴皮子功夫的竞技场。', bestMatch: { name: '桌面嘴炮王', desc: '棋逢对手，精彩绝伦' }, worstMatch: { name: '世界观收藏家', desc: '他在欣赏宇宙，你在搞政治' } },
+  '气氛发动机': { type: 'TO', tags: ['派对快乐狗', '洒脱派'], hiddenTags: ['派对快乐狗', '洒脱派', '快乐输家'], radar: [3.0, 5.0, 4.0, 7.0, 8.5, 5.0], desc: '没有你，这局就是几个人坐在一起翻牌。有了你，变成一场派对。负责活跃气氛、制造笑点、调动情绪，输了带头鼓掌，赢了带头庆祝。不一定最会玩游戏，但一定是大家最想带上的人。唯一的问题是小心邻居来敲门！', bestMatch: { name: '体验导演人', desc: '一个造氛围，一个填内容，完美搭档' }, worstMatch: { name: '解题机器', desc: '你在哈哈大笑，他在皱眉算牌，互相干扰' } },
+  '角色扮演疯子': { type: 'TN', tags: ['角色扮演疯子', '快乐输家'], hiddenTags: ['角色扮演疯子', '快乐输家', '派对快乐狗'], radar: [3.5, 8.8, 3.0, 4.5, 7.0, 5.0], desc: '玩剧本杀会哭。DND里为角色写三千字背景故事。玩大老鼠时读剧本读到忘记自己是谁，全程用角色语气说话。朋友觉得你"戏太多了"——但结局揭晓时，你真的会落泪，因为真的在乎。', bestMatch: { name: '故事说书人', desc: '绝配，两人能把一局游戏演成一部剧' }, worstMatch: { name: '解题机器', desc: '你在演戏，他在算分，宇宙尽头的错配' } },
+  '测评博主': { type: 'BS', tags: ['钻研实干家', '规则判官'], hiddenTags: ['钻研实干家', '规则判官', '策略原教旨主义者'], radar: [7.0, 6.0, 6.5, 5.0, 4.5, 8.0], desc: '买游戏之前，BGG打分人数一定要过300，评分要过7.5，最差也要看完三篇深度评测。收藏列表比大多数桌游店库存还精挑细选。不是在玩桌游，是在用桌游做系统性研究。朋友买游戏之前都要来问你。', bestMatch: { name: '桌游传教士', desc: '你研究，他传播，分工明确' }, worstMatch: { name: '美术氪金狗', desc: '你要游戏设计，他要颜值，选游戏永远吵架' } },
+  '颜控败家子': { type: 'BN', tags: ['洒脱圣人', '永恒萌新'], hiddenTags: ['洒脱圣人', '永恒萌新', '派对快乐狗'], radar: [3.0, 7.5, 3.0, 4.0, 5.0, 9.0], desc: '游戏柜是一个美术馆。会为了插画风格独特买一款自己根本不会玩的游戏，然后拆封摆着欣赏。机制要求只有一条：不要破坏沉浸感。桌游不只是游戏，是可以把玩的艺术品，是每晚睡前翻看一遍的慰藉。', bestMatch: { name: '世界观收藏家', desc: '两人都爱主题，趣味相投' }, worstMatch: { name: '胜利方程式', desc: '你买来欣赏，他买来研究，根本玩不到一起' } },
+  '桌游安利狂': { type: 'BO', tags: ['桌游安利狂', '派对快乐狗'], hiddenTags: ['桌游安利狂', '派对快乐狗', '社交疲劳症'], radar: [4.0, 5.5, 4.0, 8.0, 6.5, 8.5], desc: '买的每一款游戏都自带传播使命。组局是为了推销新游戏，消费是为了积累弹药。朋友圈图片九宫格里一半是新到的开箱照，另一半是约局通知。记得每个朋友喜欢什么类型，精准推荐，成功率极高——行走的桌游KOL。', bestMatch: { name: '路人甲', desc: '你热情推荐，他随便应付——但你不在乎，你在乎的是有人听进去了' }, worstMatch: { name: '路人甲', desc: '你热情安利，他完全不买账' } },
+  '六边形战士': { type: 'SCNOTB', tags: ['全能', '无敌'], hiddenTags: ['全能', '无敌', '桌游之神'], radar: [8.0, 8.0, 8.0, 8.0, 8.0, 8.0], desc: '你是桌游圈传说中的全能体。策略你懂，剧情你代入，胜负你争，局你来组，嘴炮你擅长，氪金你舍得。朋友们一边嫉妒你一边抢着约你打牌，因为和你打一局能同时体验到所有乐趣。你不是人，你是桌游局的最优解。', bestMatch: { name: '路人甲', desc: '带ta入门，成就感拉满' }, worstMatch: { name: '桌面嘴炮王', desc: '他只想享受，但你还想赢' } },
+  '路人甲': { type: 'scnotb', tags: ['低调', '神秘'], hiddenTags: ['低调', '神秘', '蹭局型'], radar: [2.5, 2.5, 2.5, 2.5, 2.5, 2.5], desc: '你出现在桌游局，这件事本身已经是今天最大的贡献。你不争不抢，不组局不消费，不嘴炮不代入，就静静坐在那里，配合大家出牌。你是桌游局最无害的存在，也是气氛最稳定的底座。有时候你自己也不确定为什么来了——但你来了，这就够了。', bestMatch: { name: '组局永动机', desc: '有人张罗你才能出现' }, worstMatch: { name: '棋盘角斗士', desc: '他要认真下棋，你没准备好认真' } }
+};
+
+// ── 状态变量 ──────────────────────────────────────────────
+var currentQ = 0;
+var answers = {};
+var hiddenTags = [];
+
+// ── 页面切换 ──────────────────────────────────────────────
+function showPage(id) {
+  var pages = ['page-home', 'page-normal', 'page-quick', 'page-result'];
+  pages.forEach(function(p) {
+    var el = document.getElementById(p);
+    if (p === id) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  });
+}
+
+function showHome() { showPage('page-home'); }
+function startNormal() { answers = {}; hiddenTags = []; currentQ = 0; showPage('page-normal'); renderQuestion(); }
+function startQuick() { showPage('page-quick'); }
+
+// ── 渲染题目 ──────────────────────────────────────────────
+function renderQuestion() {
+  var q = questions[currentQ];
+  document.getElementById('q-num').textContent = currentQ + 1;
+  document.getElementById('progress-fill').style.width = ((currentQ + 1) / 20 * 100) + '%';
+  
+  var qText = q.q;
+  if (q.multi) {
+    var answered = answers[q.id] || [];
+    if (answered.length === 0) qText += '（请选择第一个）';
+    else if (answered.length === 1) qText += '（请选择第二个）';
+  }
+  document.getElementById('question').textContent = qText;
+  
+  var container = document.getElementById('options');
+  container.innerHTML = '';
+  
+  var answered = answers[q.id] || [];
+  
+  q.options.forEach(function(opt) {
+    var div = document.createElement('div');
+    var isSelected = answered.indexOf(opt.label) !== -1;
+    div.className = 'option' + (isSelected ? ' selected' : '');
+    div.innerHTML = '<span class="label">' + opt.label + '.</span> ' + opt.text;
+    div.onclick = (function(label) { return function() { selectOption(label); }; })(opt.label);
+    container.appendChild(div);
+  });
+  
+  document.getElementById('page-normal').querySelector('.btn-back').style.visibility = currentQ === 0 ? 'hidden' : 'visible';
+  document.getElementById('page-normal').querySelector('.btn-next').textContent = currentQ === 19 ? '查看结果' : '下一题';
+}
+
+function selectOption(label) {
+  var q = questions[currentQ];
+  answers[q.id] = [label];
+  renderQuestion();
+  
+  // 单选自动跳转
+  setTimeout(function() { nextQ(); }, 200);
+}
+
+function prevQ() { if (currentQ > 0) { currentQ--; renderQuestion(); } }
+
+function nextQ() {
+  var q = questions[currentQ];
+  var answered = answers[q.id] || [];
+  
+  if (answered.length === 0) { alert('请选择一个答案'); return; }
+  
+  if (currentQ < 19) { currentQ++; renderQuestion(); }
+  else { showResult(); }
+}
+
+// ── 快捷测试 ──────────────────────────────────────────────
+function submitQuick() {
+  var input = document.getElementById('quick-input').value;
+  // 删除所有空格，转大写
+  var cleaned = input.replace(/\s+/g, '').toUpperCase();
+  
+  if (cleaned.length < 20) { alert('请输入20个答案，你只输入了' + cleaned.length + '个'); return; }
+  
+  answers = {};
+  hiddenTags = [];
+  questions.forEach(function(q, i) {
+    var label = cleaned[i].toUpperCase();
+    if (['A', 'B', 'C', 'D'].indexOf(label) !== -1) {
+      answers[q.id] = [label];
+    }
+  });
+  
+  showResult();
+}
+
+// ── 计算结果 ──────────────────────────────────────────────
+function calculate() {
+  var dimScores = { S: 0, N: 0, C: 0, O: 0, T: 0, B: 0 };
+  hiddenTags = [];
+  
+  questions.forEach(function(q) {
+    if (q.dim.startsWith('egg')) return;
+    
+    var answered = answers[q.id] || [];
+    var score = 0;
+    
+    if (answered.length > 0) {
+      var opt = q.options.find(function(o) { return o.label === answered[0]; });
+      score = opt ? opt.score : 0;
+    }
+    
+    dimScores[q.dim] += score;
+    
+    if (q.egg && answered.length > 0) {
+      var firstOpt = q.options.find(function(o) { return o.label === answered[0]; });
+      if (firstOpt && firstOpt.tag) hiddenTags.push(firstOpt.tag);
+    }
+  });
+  
+  var normalized = {};
+  ['S', 'N', 'C', 'O', 'T', 'B'].forEach(function(dim) {
+    var raw = dimScores[dim];
+    normalized[dim] = Math.max(0, Math.min(10, (raw - (-6)) / (6 - (-6)) * 10));
+  });
+  
+  var allHigh = Object.values(normalized).every(function(v) { return v >= 6; });
+  var allLow = Object.values(normalized).every(function(v) { return v <= 4.5; });
+
+  if (allHigh) return { name: '六边形战士', normalized: normalized };
+  if (allLow) return { name: '路人甲', normalized: normalized };
+
+  var sorted = Object.entries(normalized).sort(function(a, b) { return b[1] - a[1]; });
+  var mainDim = sorted[0][0];
+  var secondDim = sorted[1][0];
+
+  var mapping = {
+    'SC': '解题机器', 'SN': '规则学者', 'SO': '棋盘角斗士',
+    'NS': '世界观收藏家', 'NT': '故事说书人', 'NB': '美术氪金狗',
+    'CS': '胜利方程式', 'CT': '桌面嘴炮王', 'CO': '赛场主办方',
+    'OT': '组局永动机', 'OB': '桌游传教士', 'ON': '体验导演人',
+    'TC': '谈判勒索犯', 'TO': '气氛发动机', 'TN': '角色扮演疯子',
+    'BS': '测评博主', 'BN': '颜控败家子', 'BO': '桌游安利狂'
+  };
+
+  var combo = mainDim + secondDim;
+  var result = mapping[combo] || mapping[secondDim + mainDim];
+  if (!result) {
+    // 组合不在mapping里，遍历剩余所有维度尝试匹配
+    var otherDims = sorted.slice(2).map(function(item) { return item[0]; });
+    for (var i = 0; i < otherDims.length; i++) {
+      result = mapping[mainDim + otherDims[i]] || mapping[otherDims[i] + mainDim];
+      if (result) break;
+    }
+  }
+  return { name: result || '路人甲', normalized: normalized };
+}
+
+// ── Canvas 结果卡片绘制 ────────────────────────────────────
+var canvas = document.getElementById('resultCanvas');
+var ctx = canvas.getContext('2d');
+
+var C = {
+  bg1: '#ffffff', bg2: '#f8f9fa', accent: '#4a7dff', gold: '#f5a623',
+  green: '#34c759', red: '#ff3b30', text1: '#1a1a2e', text2: '#4a4a5e', text3: '#8888a0'
+};
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function wrapText(text, x, y, maxWidth, lineHeight) {
+  var lines = [];
+  var line = '';
+  for (var i = 0; i < text.length; i++) {
+    var char = text[i];
+    var test = line + char;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = char;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  lines.forEach(function(l, i) {
+    ctx.fillText(l, x, y + i * lineHeight);
+  });
+}
+
+function drawResultCard(name, userNormalized) {
+  var data = personalities[name] || personalities['体验导演人'];
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // 背景
+  var grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grd.addColorStop(0, C.bg1);
+  grd.addColorStop(1, C.bg2);
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // 人格图片
+  var imgAreaX = 20, imgAreaY = 20, imgAreaW = 192, imgAreaH = 240;
+  
+  var img = new Image();
+  img.onload = function() {
+    var imgRatio = img.width / img.height;
+    var areaRatio = imgAreaW / imgAreaH;
+    var drawW, drawH, drawX, drawY;
+    
+    if (imgRatio > areaRatio) {
+      drawW = imgAreaW; drawH = imgAreaW / imgRatio;
+      drawX = imgAreaX; drawY = imgAreaY + (imgAreaH - drawH) / 2;
+    } else {
+      drawH = imgAreaH; drawW = imgAreaH * imgRatio;
+      drawX = imgAreaX + (imgAreaW - drawW) / 2; drawY = imgAreaY;
+    }
+    
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    
+    var fadeH = 40;
+    var fadeGrd = ctx.createLinearGradient(0, imgAreaY + imgAreaH - fadeH, 0, imgAreaY + imgAreaH);
+    fadeGrd.addColorStop(0, 'rgba(255,255,255,0)');
+    fadeGrd.addColorStop(1, 'rgba(255,255,255,0.95)');
+    ctx.fillStyle = fadeGrd;
+    ctx.fillRect(imgAreaX, imgAreaY + imgAreaH - fadeH, imgAreaW, fadeH);
+    
+    // 图片右下角添加"仅供娱乐~"
+    var text = '仅供娱乐~';
+    ctx.font = '13px "PingFang SC", sans-serif';
+    var textW = ctx.measureText(text).width + 8;
+    var textH = 18;
+    var textX = imgAreaX + imgAreaW;
+    var textY = imgAreaY + imgAreaH - 14;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    roundRect(textX - textW, textY - textH, textW, textH, 4);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(text, textX, textY);
+
+    drawNameAndTags(name, data);
+    drawRadar(data, userNormalized);
+    drawBottom(data);
+  };
+  img.onerror = function() {
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    roundRect(imgAreaX, imgAreaY, imgAreaW, imgAreaH, 12);
+    ctx.fill();
+    ctx.fillStyle = C.text3;
+    ctx.font = 'bold 21px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, imgAreaX + imgAreaW/2, imgAreaY + imgAreaH/2);
+    
+    // 图片右下角添加"仅供娱乐~"
+    var text = '仅供娱乐~';
+    ctx.font = '13px "PingFang SC", sans-serif';
+    var textW = ctx.measureText(text).width + 8;
+    var textH = 18;
+    var textX = imgAreaX + imgAreaW;
+    var textY = imgAreaY + imgAreaH - 14;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    roundRect(textX - textW, textY - textH, textW, textH, 4);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(text, textX, textY);
+
+    drawNameAndTags(name, data);
+    drawRadar(data, userNormalized);
+    drawBottom(data);
+  };
+  img.src = '人格图片/' + name + '.jpg';
+}
+
+function drawNameAndTags(name, data) {
+  var nameX = 20, nameY = 275;
+  
+  ctx.fillStyle = C.text1;
+  ctx.font = 'bold 27px "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, nameX, nameY);
+  
+  var tagX = nameX + ctx.measureText(name).width + 12;
+  data.tags.forEach(function(tag) {
+    var tw = ctx.measureText(tag).width + 24;
+    ctx.fillStyle = 'rgba(74,125,255,0.12)';
+    roundRect(tagX, nameY - 11, tw, 22, 11);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(74,125,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = C.accent;
+    ctx.font = '12px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tag, tagX + tw/2, nameY);
+    tagX += tw + 8;
+  });
+  
+  ctx.fillStyle = C.text1;
+  ctx.font = 'bold 16px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('（' + data.type + '）', nameX + 14, nameY + 24);
+}
+
+function drawRadar(data, userNormalized) {
+  var cx = 350, cy = 115, maxR = 55;
+  var labels = ['策略', '剧情', '胜负', '组局', '嘴炮', '消费'];
+  var dims = ['S', 'N', 'C', 'O', 'T', 'B'];
+  var n = 6, step = (Math.PI * 2) / n, startAngle = -Math.PI / 2;
+
+  // 使用真实的归一分数
+  var userVals = dims.map(function(d) { return userNormalized[d] || 5; });
+
+  for (var i = 1; i <= 5; i++) {
+    ctx.beginPath();
+    for (var j = 0; j <= n; j++) {
+      var angle = startAngle + step * j;
+      var r = (i / 5) * maxR;
+      ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  for (var k = 0; k < n; k++) {
+    var angle = startAngle + step * k;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * maxR, cy + Math.sin(angle) * maxR);
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  for (var m = 0; m <= n; m++) {
+    var angle = startAngle + step * m;
+    var val = userVals[m % n];
+    var r = (val / 10) * maxR;
+    ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+  }
+  ctx.fillStyle = 'rgba(74,125,255,0.15)';
+  ctx.fill();
+  ctx.strokeStyle = '#4a7dff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  for (var p = 0; p < n; p++) {
+    var angle = startAngle + step * p;
+    var val = userVals[p];
+    var r = (val / 10) * maxR;
+    var x = cx + Math.cos(angle) * r;
+    var y = cy + Math.sin(angle) * r;
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#4a7dff';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  for (var q = 0; q < n; q++) {
+    var angle = startAngle + step * q;
+    var labelR = maxR + 16;
+    ctx.fillStyle = C.text3;
+    ctx.font = 'bold 11px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labels[q], cx + Math.cos(angle) * labelR, cy + Math.sin(angle) * labelR);
+
+    ctx.fillStyle = C.accent;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(userVals[q].toFixed(1), cx + Math.cos(angle) * (maxR + 40), cy + Math.sin(angle) * (maxR + 40));
+  }
+}
+
+function drawBottom(data) {
+  var contentX = 20, contentY = 315, contentW = canvas.width - 40;
+
+  ctx.fillStyle = C.accent;
+  ctx.font = 'bold 14px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('· 人格解析 ·', contentX, contentY);
+
+  ctx.fillStyle = C.text2;
+  ctx.font = '14px "PingFang SC", sans-serif';
+  wrapText(data.desc, contentX, contentY + 20, contentW, 21);
+
+  var relY = 420, relW = (contentW - 10) / 2, relH = 65;
+  drawRelationCard(contentX, relY, relW, relH, '最佳搭子', data.bestMatch.name, data.bestMatch.desc, C.green);
+  drawRelationCard(contentX + relW + 10, relY, relW, relH, '天克冤家', data.worstMatch.name, data.worstMatch.desc, C.red);
+  
+  ctx.fillStyle = C.text3;
+  ctx.font = '12px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('🎭 隐藏属性', contentX, relY + relH + 12);
+
+  var tagY = relY + relH + 34, lineH = 28;
+  var maxX = canvas.width - 20;
+  var tagPadding = 20, tagGap = 8, tagH = 22, tagRadius = 11;
+
+  // 预排版：每行统一宽度（取该行最大宽度）
+  ctx.font = '11px "PingFang SC", sans-serif';
+  var rows = [], currentRow = [], tx = contentX, maxW = 0;
+  for (var i = 0; i < data.hiddenTags.length; i++) {
+    var tag = data.hiddenTags[i];
+    var tw = ctx.measureText(tag).width + tagPadding;
+    if (tx + tw > maxX && currentRow.length > 0) {
+      rows.push({tags: currentRow.slice(), maxW: maxW});
+      currentRow = []; tx = contentX; maxW = 0;
+    }
+    currentRow.push(tag);
+    maxW = Math.max(maxW, tw);
+    tx += tw + tagGap;
+  }
+  if (currentRow.length > 0) rows.push({tags: currentRow, maxW: maxW});
+
+  // 绘制：每行用统一宽度
+  ty = tagY;
+  for (var r = 0; r < rows.length; r++) {
+    tx = contentX;
+    var row = rows[r];
+    for (var i = 0; i < row.tags.length; i++) {
+      var tag = row.tags[i];
+      ctx.fillStyle = 'rgba(245,166,35,0.12)';
+      roundRect(tx, ty, row.maxW, tagH, tagRadius);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245,166,35,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = C.gold;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tag, tx + row.maxW / 2, ty + tagH / 2);
+      tx += row.maxW + tagGap;
+    }
+    ty += lineH;
+  }
+  
+  ctx.fillStyle = C.text3;
+  ctx.font = '11px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('BGTI  ·  桌游人格测试', canvas.width / 2, canvas.height - 12);
+}
+
+function drawRelationCard(x, y, w, h, label, name, desc, color) {
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  roundRect(x, y, w, h, 11);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  
+  ctx.fillStyle = color;
+  ctx.font = 'bold 10px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(label, x + 10, y + 8);
+  
+  ctx.fillStyle = C.text1;
+  ctx.font = 'bold 13px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(name, x + 10, y + 22);
+  
+  ctx.fillStyle = C.text3;
+  ctx.font = '10px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(desc, x + 10, y + 38, w - 20);
+}
+
+// ── 显示结果 ──────────────────────────────────────────────
+function showResult() {
+  var result = calculate();
+  showPage('page-result');
+  drawResultCard(result.name, result.normalized);
+}
+
+function restart() { showPage('page-home'); }
+</script>
+</body>
+</html>
